@@ -6,23 +6,14 @@
 
 
 #include "jsonrpc_plugin_yajl.h"
-#include <jsonrpc_macro.h>
 
 #include <yajl/yajl_tree.h>
 
 
 static jsonrpc_handle_t	jsonrpc_yajl_parse  (const char *json)
 {
-#ifdef	JSONRPC_DEBUG
-	char     errbuf[1024];
-	yajl_val root = yajl_tree_parse(json, errbuf, 1024);
-	if (!root)
-	{
-		fprintf(stderr, "%s() error: %s\n", __FUNCTION__, errbuf);
-	}
-#else
 	yajl_val root = yajl_tree_parse(json, NULL, 0);
-#endif
+	
 	return (jsonrpc_handle_t)root;
 }
 
