@@ -1,9 +1,9 @@
-//
-//  jsonrpc_plugin_yajl.c
-//  jsonrpc
-//
-//
-
+/*
+ * Copyright (c) 2012 Jonghyeok Lee <jhlee4bb@gmail.com>
+ *
+ * jsonrpC is free software; you can redistribute it and/or modify
+ * it under the terms of the MIT license. See LICENSE for details.
+ */
 
 #include "jsonrpc_plugin_yajl.h"
 
