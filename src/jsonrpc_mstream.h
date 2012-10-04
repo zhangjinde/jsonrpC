@@ -14,12 +14,29 @@
 
 typedef struct jsonrpc_mstream	jsonrpc_mstream_t;
 
+/**
+ * Open the memory stream.
+ *
+ * @return instance of 'jsonrpc_mstream_t'
+ */
 jsonrpc_mstream_t *
 jsonrpc_mstream_open (void);
 
+/**
+ * Close the memory stream.
+ *
+ * @param mstream	instance of 'jsonrpc_mstream_t'
+ */
 void
 jsonrpc_mstream_close (jsonrpc_mstream_t *mstream);
 
+/**
+ * Formatted input to memory stream
+ *
+ * @param mstream	instance of 'jsonrpc_mstream_t'
+ * @param fmt	format (same as printf's)
+ * @param ap	variable-length argument
+ * @return The number of characters that would have been writtend. (if error, return -1)
 int
 jsonrpc_mstream_vprint (jsonrpc_mstream_t *mstream, const char *fmt, va_list ap);
 
