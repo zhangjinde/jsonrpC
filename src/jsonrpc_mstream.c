@@ -70,10 +70,10 @@ jsonrpc_mstream_vprint (jsonrpc_mstream_t *mstream, const char *fmt, va_list ap)
 	{
 		JSONRPC_THROW(mstream_grow(mstream) == 0, return -1);
 	}
-	stream = mstream->stream + mstream->length;
 
 	while (retry--)
 	{
+		stream  = mstream->stream + mstream->length;
 		length  = mstream->alloc - mstream->length - 1/*for NULL*/;
 		written = vsnprintf(stream, length, fmt, ap);
 		if (0 <= written && written < (int)length)

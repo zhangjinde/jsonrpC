@@ -6,24 +6,28 @@
  */
 
 #include <stdio.h>
+#include <math.h>
 #include <jsonrpc.h>
 #include "../plugins/jsonrpc_plugin_yajl.h"
 
 jsonrpc_error_t subtract (int argc, const jsonrpc_param_t *argv, void (* print_result)(void *ctx, const char *fmt, ...), void *ctx)
 {
-	double r;
+	double r, f;
 
 	printf("%s(argc:%d)\n", __FUNCTION__, argc);
 
 	r = argv[0].json.u.number - argv[1].json.u.number;
-
-	print_result(ctx, "%lf", r);
+	f = fmod(r, 1.0);
+	if (f == 0.0)
+		print_result(ctx, "%.0lf", r);
+	else
+		print_result(ctx, "%lf", r);
 	return JSONRPC_ERROR_OK;
 }
 
 jsonrpc_error_t sum (int argc, const jsonrpc_param_t *argv, void (* print_result)(void *ctx, const char *fmt, ...), void *ctx)
 {
-	double r = 0.0;
+	double r = 0.0, f;
 
 	printf("%s(argc:%d)\n", __FUNCTION__, argc);
 
@@ -32,20 +36,26 @@ jsonrpc_error_t sum (int argc, const jsonrpc_param_t *argv, void (* print_result
 		r += argv[argc].json.u.number;
 	}
 
-	print_result(ctx, "%lf", r);
+	f = fmod(r, 1.0);
+	if (f == 0.0)
+		print_result(ctx, "%.0lf", r);
+	else
+		print_result(ctx, "%lf", r);
 	return JSONRPC_ERROR_OK;
 }
 
 jsonrpc_error_t multiply (int argc, const jsonrpc_param_t *argv, void (* print_result)(void *ctx, const char *fmt, ...), void *ctx)
 {
-	double r;
+	double r, f;
 
 	printf("%s(argc:%d)\n", __FUNCTION__, argc);
 
 	r = argv[0].json.u.number * argv[1].json.u.number;
-
-	print_result(ctx, "%lf", r);
-
+	f = fmod(r, 1.0);
+	if (f == 0.0)
+		print_result(ctx, "%.0lf", r);
+	else
+		print_result(ctx, "%lf", r);
 	return JSONRPC_ERROR_OK;
 }
 
@@ -130,8 +140,74 @@ int main (int argc, const char * argv[])
 		printf("--> %s\n<-- %s\n\n", req, res);
 	}
 
+	printf("[a Notification:]\n");
+	req = "{\"jsonrpc\": \"2.0\", \"method\": \"update\", \"params\": [1,2,3,4,5]}";
+	res = jsonrpc_server_execute(server, req);
+	printf("--> %s\n<-- %s\n\n", req, res);
 
-	jsonrpc_server_close(server);  
+	req = "{\"jsonrpc\": \"2.0\", \"method\": \"foobar\"}";
+	res = jsonrpc_server_execute(server, req);
+	printf("--> %s\n<-- %s\n\n", req, res);
+
+	printf("[rpc call of non-existent method:]\n");
+	req = "{\"jsonrpc\": \"2.0\", \"method\": \"foobar\", \"id\": \"1\"}";
+	res = jsonrpc_server_execute(server, req);
+	printf("--> %s\n<-- %s\n\n", req, res);
+
+	printf("[rpc call with invalid JSON:]\n");
+	req = "{\"jsonrpc\": \"2.0\", \"method\": \"foobar, \"params\": \"bar\", \"baz]";
+	res = jsonrpc_server_execute(server, req);
+	printf("--> %s\n<-- %s\n\n", req, res);
+
+	printf("[rpc call with invalid Request object:]\n");
+	req = "{\"jsonrpc\": \"2.0\", \"method\": 1, \"params\": \"bar\"}";
+	res = jsonrpc_server_execute(server, req);
+	printf("--> %s\n<-- %s\n\n", req, res);
+
+	printf("[rpc call Batch, invalid JSON:]\n");
+	req = "["
+			  "{\"jsonrpc\": \"2.0\", \"method\": \"sum\", \"params\": [1,2,4], \"id\": \"1\"},"
+			  "{\"jsonrpc\": \"2.0\", \"method\""
+		"]";
+	res = jsonrpc_server_execute(server, req);
+	printf("--> %s\n<-- %s\n\n", req, res);
+
+	printf("[rpc call with an empty Array:]\n");
+	req = "[]";
+	res = jsonrpc_server_execute(server, req);
+	printf("--> %s\n<-- %s\n\n", req, res);
+
+	printf("[rpc call with an invalid Batch (but not empty):]\n");
+	req = "[1]";
+	res = jsonrpc_server_execute(server, req);
+	printf("--> %s\n<-- %s\n\n", req, res);
+
+	printf("[rpc call with invalid Batch:]\n");
+	req = "[1,2,3]";
+	res = jsonrpc_server_execute(server, req);
+	printf("--> %s\n<-- %s\n\n", req, res);
+
+	printf("[rpc call Batch:]\n");
+	req =  "["
+			"{\"jsonrpc\": \"2.0\", \"method\": \"sum\", \"params\": [1,2,4], \"id\": \"1\"},"
+			"{\"jsonrpc\": \"2.0\", \"method\": \"notify_hello\", \"params\": [7]},"
+			"{\"jsonrpc\": \"2.0\", \"method\": \"subtract\", \"params\": [42,23], \"id\": \"2\"},"
+			"{\"foo\": \"boo\"},"
+			"{\"jsonrpc\": \"2.0\", \"method\": \"foo.get\", \"params\": {\"name\": \"myself\"}, \"id\": \"5\"},"
+			"{\"jsonrpc\": \"2.0\", \"method\": \"get_data\", \"id\": \"9\"} "
+    	"]";
+	res = jsonrpc_server_execute(server, req);
+	printf("--> %s\n<-- %s\n\n", req, res);
+
+	printf("[rpc call Batch (all notifications):]\n");
+	req = "["
+			"{\"jsonrpc\": \"2.0\", \"method\": \"notify_sum\", \"params\": [1,2,4]},"
+			"{\"jsonrpc\": \"2.0\", \"method\": \"notify_hello\", \"params\": [7]}"
+    	"]";
+	res = jsonrpc_server_execute(server, req);
+	printf("--> %s\n<-- %s\n\n", req, res);
+
+	jsonrpc_server_close(server);
 	return 0;
 }
 

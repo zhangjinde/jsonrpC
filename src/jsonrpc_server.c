@@ -35,6 +35,7 @@ struct jsonrpc_server
 
 	struct {
 		jsonrpc_mstream_t	*mstream[JSONRPC_MEMSTREAM_NUM];
+		jsonrpc_bool_t		used[JSONRPC_MEMSTREAM_NUM];
 		size_t				index;
 	} stream;
 
@@ -74,18 +75,38 @@ JSONRPC_PRIVATE int	check_null_func (void *plugin, size_t n)
 	return (int)n;
 }
 
-JSONRPC_PRIVATE jsonrpc_mstream_t * get_memstream (jsonrpc_server_t *self)
+JSONRPC_PRIVATE jsonrpc_mstream_t * get_memstream (jsonrpc_server_t *self, jsonrpc_bool_t auto_release)
 {
 	size_t	i = self->stream.index;
-
-	self->stream.index = (self->stream.index + 1) % JSONRPC_MEMSTREAM_NUM;
-
-	if (self->stream.mstream[i] == NULL)
+	int		n = JSONRPC_MEMSTREAM_NUM;
+	do
 	{
-		self->stream.mstream[i] = jsonrpc_mstream_open();
-	}
+		i = (i + 1) % JSONRPC_MEMSTREAM_NUM;
+		if (self->stream.mstream[i] == NULL)
+		{
+			self->stream.mstream[i] = jsonrpc_mstream_open();
+		}
+	} while (n-- && (self->stream.used[i] || self->stream.mstream[i] == NULL));
+	if (n < 0)
+		return NULL;
+	self->stream.index = i;
+	if (!auto_release)
+		self->stream.used[i] = JSONRPC_TRUE;
 	jsonrpc_mstream_rewind(self->stream.mstream[i]);
 	return self->stream.mstream[i];
+}
+
+JSONRPC_PRIVATE void	release_memstream (jsonrpc_server_t *self, jsonrpc_mstream_t *stream)
+{
+	int	n = JSONRPC_MEMSTREAM_NUM;
+	while (n--)
+	{
+		if (self->stream.mstream[n] == stream)
+		{
+			self->stream.used[n] = JSONRPC_FALSE;
+			break;
+		}
+	}
 }
 
 JSONRPC_PRIVATE jsonrpc_param_t * get_temp_param (jsonrpc_server_t *self, size_t size)
@@ -126,6 +147,24 @@ JSONRPC_PRIVATE jsonrpc_json_t * get_temp_value (jsonrpc_server_t *self)
 	return self->tempval.value + i;
 }
 
+
+JSONRPC_PRIVATE jsonrpc_bool_t	str_startwith (const char *str, char c)
+{
+	while (isspace(*str))
+		str++;
+	return (*str == c) ? JSONRPC_TRUE : JSONRPC_FALSE;
+}
+
+JSONRPC_PRIVATE const char *make_batch_object (jsonrpc_server_t *self, const char *request)
+{
+	jsonrpc_mstream_t	*stream;
+
+	stream = get_memstream(self, JSONRPC_TRUE);
+	if (!stream)
+		return NULL;
+	jsonrpc_mstream_print(stream, "{\"batch\":%s}", request);
+	return jsonrpc_mstream_getbuf(stream);
+}
 
 JSONRPC_PRIVATE char * strdup_without_space (jsonrpc_server_t *self, const char *str)
 {
@@ -301,7 +340,7 @@ JSONRPC_PRIVATE const char * get_error_object (jsonrpc_server_t *self, jsonrpc_e
 		return NULL;	// The server MUST NOT reply except "Parse error/Invalid Request".
 	}
 
-	JSONRPC_THROW((stream = get_memstream(self)) == NULL, return NULL);
+	JSONRPC_THROW((stream = get_memstream(self, JSONRPC_TRUE)) == NULL, return NULL);
 
 	jsonrpc_mstream_print(stream, "{");
 	{
@@ -574,7 +613,7 @@ JSONRPC_PRIVATE const char * execute_request (jsonrpc_server_t *self, jsonrpc_ha
 		return NULL;
 	}
 
-	JSONRPC_THROW((result = get_memstream(self)) == NULL
+	JSONRPC_THROW((result = get_memstream(self, JSONRPC_TRUE)) == NULL
 		, return get_error_object(self, JSONRPC_ERROR_SERVER_OUT_OF_MEMORY, id)
 	);
 	err = proc->method((int)paramc, paramv
@@ -582,7 +621,7 @@ JSONRPC_PRIVATE const char * execute_request (jsonrpc_server_t *self, jsonrpc_ha
 			, (void *)result
 		);
 	JSONRPC_THROW(err != JSONRPC_ERROR_OK, return get_error_object(self, err, id));
-	JSONRPC_THROW((response = get_memstream(self)) == NULL
+	JSONRPC_THROW((response = get_memstream(self, JSONRPC_TRUE)) == NULL
 		, return get_error_object(self, JSONRPC_ERROR_SERVER_OUT_OF_MEMORY, id)
 	);
 
@@ -602,7 +641,6 @@ JSONRPC_PRIVATE const char * execute_request (jsonrpc_server_t *self, jsonrpc_ha
 	return jsonrpc_mstream_getbuf(response);
 }
 
-
 JSONRPC_PRIVATE const char * execute (jsonrpc_server_t *self, const char *data)
 {
 	jsonrpc_handle_t	request;
@@ -614,7 +652,7 @@ JSONRPC_PRIVATE const char * execute (jsonrpc_server_t *self, const char *data)
 
 	error = JSONRPC_ERROR_OK;
 	JSONRPC_THROW(!(request = JSONRPC_JSONAPI(self)->parse(data)), {
-		error = JSONRPC_ERROR_INVALID_PARAMS;
+		error = JSONRPC_ERROR_PARSE_ERROR;
 		goto RESPONSE;
 	});
 	json_value = get_temp_value(self);
@@ -622,39 +660,48 @@ JSONRPC_PRIVATE const char * execute (jsonrpc_server_t *self, const char *data)
 		error = JSONRPC_ERROR_SERVER_INTERNAL;
 		goto RESPONSE;
 	});
-	JSONRPC_THROW(json_value->type != JSONRPC_TYPE_ARRAY && json_value->type != JSONRPC_TYPE_OBJECT, {
+	JSONRPC_THROW(json_value->type != JSONRPC_TYPE_OBJECT, {
 		error = JSONRPC_ERROR_INVALID_REQUEST;
 		goto RESPONSE;
 	});
 
-	if (json_value->type == JSONRPC_TYPE_ARRAY)	// batch
+	if ((json_value = get_json_value(self, request, "batch", "a")) != NULL)	// batch
 	{
 		size_t	i, c, n;
+		jsonrpc_handle_t batch = json_value->u.array;
 
-		resbuf = get_memstream(self);
-		if (resbuf)
+		JSONRPC_THROW((n = JSONRPC_JSONAPI(self)->length(batch)) == 0, {
+			error = JSONRPC_ERROR_INVALID_REQUEST;
+			goto RESPONSE;
+		});
+		JSONRPC_THROW((resbuf = get_memstream(self, JSONRPC_FALSE)) == NULL, {
+			error = JSONRPC_ERROR_SERVER_INTERNAL;
+			goto RESPONSE;
+		});
+
+		jsonrpc_mstream_print(resbuf, "[");
+		for (i = 0, c = 0 ; i < n ; i++)
 		{
-			jsonrpc_mstream_print(resbuf, "[");
-			for (i = 0, c = 0, n = JSONRPC_JSONAPI(self)->length(request) ; i < n ; i++)
-			{
-				value = JSONRPC_JSONAPI(self)->get_at(request, i);
-				if (!value)
-					response = get_error_object(self, JSONRPC_ERROR_INVALID_REQUEST, NULL);
-				else
-					response = execute_request(self, value);
+			value = JSONRPC_JSONAPI(self)->get_at(batch, i);
+			if (!value)
+				response = get_error_object(self, JSONRPC_ERROR_INVALID_REQUEST, NULL);
+			else
+				response = execute_request(self, value);
 
-				if (response)
-				{
-					if (c > 0)
-						jsonrpc_mstream_print(resbuf, ",");
-					jsonrpc_mstream_print(resbuf, response);
-					c++;
-				}
+			if (response)
+			{
+				if (c > 0)
+					jsonrpc_mstream_print(resbuf, ",");
+				jsonrpc_mstream_print(resbuf, response);
+				c++;
 			}
-			jsonrpc_mstream_print(resbuf, "]");
-			if (c == 0)
-				response = NULL;
-		} else response = NULL;
+		}
+		jsonrpc_mstream_print(resbuf, "]");
+		if (c == 0)
+			response = NULL;
+		else response = jsonrpc_mstream_getbuf(resbuf);
+
+		release_memstream(self, resbuf);
 	}
 	else //if (json_value->type == JSONRPC_TYPE_OBJECT)
 	{
@@ -662,7 +709,8 @@ JSONRPC_PRIVATE const char * execute (jsonrpc_server_t *self, const char *data)
 	}
 
 RESPONSE:
-	JSONRPC_JSONAPI(self)->release(request);
+	if (request)
+		JSONRPC_JSONAPI(self)->release(request);
 	if (error != JSONRPC_ERROR_OK)
 		return get_error_object(self, error, NULL);
 	return response;
@@ -774,6 +822,12 @@ jsonrpc_server_register_method (
 const char *
 jsonrpc_server_execute (jsonrpc_server_t *self, const char *request)
 {
+	if (str_startwith(request, '[')) // batch
+	{
+		request = make_batch_object(self, request);
+		if (request == NULL)
+			return NULL;
+	}
 	return execute(self, request);
 }
 
