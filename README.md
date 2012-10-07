@@ -1,7 +1,7 @@
 jsonrpC
 =======
 
-jsonrpC is an implementation of [JSON RPC 2.0](http://www.jsonrpc.org/specification) protocol in C.
+[jsonrpC](http://jhlee4bb.github.com/jsonrpC) is an implementation of [JSON RPC 2.0](http://www.jsonrpc.org/specification) protocol in C.
 * Simple API
 * Portable
  * The implementation is ANSI C.
