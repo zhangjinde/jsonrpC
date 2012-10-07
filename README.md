@@ -46,3 +46,9 @@ $./jsonrpc
 ```
 open test_websocket.html (with WebSocket supported browser)
 ![screenshot](http://farm9.staticflickr.com/8454/8062570242_1aea4d2602.jpg)
+
+##ToDo
+* build with autotools or CMake
+* jsonrpC client library
+* jansson json plugin
+
