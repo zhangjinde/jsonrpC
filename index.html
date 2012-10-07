@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
+
+    <title>Jsonrpc by jhlee4bb</title>
+  </head>
+
+  <body>
+
+    <header>
+      <div class="container">
+        <h1>Jsonrpc</h1>
+        <h2>JSON RPC C Implementation</h2>
+
+        <section id="downloads">
+          <a href="https://github.com/jhlee4bb/jsonrpC/zipball/master" class="btn">Download as .zip</a>
+          <a href="https://github.com/jhlee4bb/jsonrpC/tarball/master" class="btn">Download as .tar.gz</a>
+          <a href="https://github.com/jhlee4bb/jsonrpC" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+        </section>
+      </div>
+    </header>
+
+    <div class="container">
+      <section id="main_content">
+        <h1>jsonrpC</h1>
+
+<p>jsonrpC is an implementation of <a href="http://www.jsonrpc.org/specification">JSON RPC 2.0</a> protocol in C.</p>
+
+<ul>
+<li>Simple API</li>
+<li>Portable
+
+<ul>
+<li>The implementation is ANSI C.</li>
+<li>JSON library can be easily ported. (e.g. <a href="http://lloyd.github.com/yajl">yajl</a>, <a href="http://www.digip.org/jansson/">jansson</a>)</li>
+<li>Transport independent. You can use this library with UDS, WebSocket, ...</li>
+</ul>
+</li>
+<li>Tiny</li>
+</ul><p>jsonrpC is licensed under the <a href="http://www.opensource.org/licenses/mit-license.php">MIT License</a></p>
+
+<h2>Example</h2>
+
+<h4>Register Method</h4>
+
+<div class="highlight"><pre><span class="n">jsonrpc_server_t</span> <span class="o">*</span> <span class="nf">init_jsonrpc</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="n">jsonrpc_server_t</span> <span class="o">*</span><span class="n">server</span><span class="p">;</span>
+    <span class="n">jsonrpc_error_t</span>   <span class="n">error</span><span class="p">;</span>
+
+    <span class="n">server</span> <span class="o">=</span> <span class="n">jsonrpc_server_open</span><span class="p">(</span><span class="n">jsonrpc_plugin_yajl</span><span class="p">());</span>
+
+    <span class="n">error</span>  <span class="o">=</span> <span class="n">jsonrpc_server_register_method</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">JSONRPC_TRUE</span><span class="p">,</span> <span class="n">subtract</span><span class="p">,</span> <span class="s">"subtract"</span><span class="p">,</span> <span class="s">"minuend:i, subtrahend:i"</span><span class="p">);</span>
+    <span class="n">error</span>  <span class="o">=</span> <span class="n">jsonrpc_server_register_method</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">JSONRPC_TRUE</span><span class="p">,</span> <span class="n">sum</span><span class="p">,</span> <span class="s">"sum"</span><span class="p">,</span> <span class="s">"iii"</span><span class="p">);</span>
+  <span class="c1">// add more method here</span>
+  <span class="k">return</span> <span class="n">server</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+
+<h4>Execute request</h4>
+
+<div class="highlight"><pre><span class="kt">void</span> <span class="nf">execute_jsonrpc</span><span class="p">(</span><span class="n">jsonrpc_server_t</span> <span class="o">*</span><span class="n">server</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="k">const</span> <span class="kt">char</span>       <span class="o">*</span><span class="n">req</span><span class="p">,</span> <span class="o">*</span><span class="n">res</span><span class="p">;</span>
+
+    <span class="n">req</span> <span class="o">=</span> <span class="s">"{</span><span class="se">\"</span><span class="s">jsonrpc</span><span class="se">\"</span><span class="s">: </span><span class="se">\"</span><span class="s">2.0</span><span class="se">\"</span><span class="s">, </span><span class="se">\"</span><span class="s">method</span><span class="se">\"</span><span class="s">: </span><span class="se">\"</span><span class="s">subtract</span><span class="se">\"</span><span class="s">, </span><span class="se">\"</span><span class="s">params</span><span class="se">\"</span><span class="s">: {</span><span class="se">\"</span><span class="s">subtrahend</span><span class="se">\"</span><span class="s">: 23, </span><span class="se">\"</span><span class="s">minuend</span><span class="se">\"</span><span class="s">: 42}, </span><span class="se">\"</span><span class="s">id</span><span class="se">\"</span><span class="s">: 3}"</span><span class="p">;</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">jsonrpc_server_execute</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">req</span><span class="p">);</span>
+    <span class="c1">// use 'res'</span>
+<span class="p">}</span>
+</pre></div>
+
+<h4>Example code (screenshot)</h4>
+
+<p>run server</p>
+
+<div class="highlight"><pre><span class="nv">$make</span>
+<span class="nv">$.</span>/jsonrpc
+</pre></div>
+
+<p>open test_websocket.html (with WebSocket supported browser)
+<img src="http://farm9.staticflickr.com/8454/8062570242_1aea4d2602.jpg" alt="screenshot"></p>
+
+<h2>ToDo</h2>
+
+<ul>
+<li>build with autotools or CMake</li>
+<li>jsonrpC client library</li>
+<li>jansson json plugin</li>
+</ul>
+      </section>
+    </div>
+
+    
+  </body>
+</html>
