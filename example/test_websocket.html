@@ -1,0 +1,90 @@
+
+
+<!DOCTYPE html>
+<html lang="en-US">
+	<head>
+		<title>JSON-RPC WebSocket test app</title>
+		<link rel="stylesheet" type="text/css" href="http://w3schools.com/tryit.css" />
+		<script type="text/javascript">
+			
+			var ws;
+			
+			function init()
+			{
+				ws = new WebSocket("ws://localhost:8212", "jsonrpc-server-websocket");
+				ws.onopen = function(e) {
+					writeLog('WebSocket: CONNECTED');
+				};
+				ws.onclose = function(e) {
+					writeLog('WebSocket: DISCONNECTED');
+				};
+				ws.onmessage = function(e) {
+					writeLog('<-- ' + e.data);
+				};
+				ws.onerror = function(e) {
+					writeLog('WebSocket: ERROR(' + e.data + ')');
+				};
+			}
+			function request()
+			{
+				var json=document.getElementById("pre_code").value;
+				
+				writeLog('--> ' + json)
+				ws.send(json);
+			}
+			function writeLog(text)
+			{
+				document.getElementById("pre_output").value += text + '\n';
+			}
+			function resetLog()
+			{
+				document.getElementById("pre_output").value = "";
+			}
+			window.addEventListener("load", init, false);
+			</script>
+	</head>
+	<body>
+		<iframe width="100%" height="400px" id="jsonrpc_spec" src="http://www.jsonrpc.org/specification">
+		</iframe>
+		<div style="margin:0px">
+			
+			<table border="0" class="maintable">
+				<tr>
+					<td width="50%">
+						
+						<input style="font-family:verdana;" name="submit" type="submit" value="Request" onclick="request();">
+						</input>
+														
+					</td>
+					
+					<td>
+						<input style="font-family:verdana;margin-left:10px;float:right;" type="button" value="Reset" onclick="resetLog();">
+						</input>
+						<span class="result_header">Response</span></td>
+				</tr>
+				<tr>
+					<td valign="top">
+						
+						<textarea class="code_input" width="100%" height="400px" id="pre_code" wrap="logical">{"jsonrpc" = "2.0", "method" : "subtract", "params":[1,2], "id":1}</textarea>
+						<input type="hidden" name="code" id="code" />
+						<input type="hidden" id="bt" name="bt" />
+						
+					</td>
+					<td valign="top">
+						<textarea class="code_input" with="100%" height="400px" id="pre_output" wrap="logical" readonly="readonly"></textarea>
+					</td>
+				</tr>
+				<tr>
+					<td align="left" class="bottomtext">
+						Edit the code above and click to see the result.
+					</td>
+					<td align="right" class="bottomtext">
+						<a style="color:#617f10" href="http://www.jsonrpc.org">jsonrpc.org</a>
+					</td>
+				</tr>
+			</table>
+			
+		</div>
+		
+	</body>
+</html>

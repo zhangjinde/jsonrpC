@@ -17,7 +17,7 @@ RANLIB := ranlib
 DEBUG_CFLAGS     := -Wall -Wno-format -g -DDEBUG
 RELEASE_CFLAGS   := -Wall -Wno-unknown-pragmas -Wno-format -O3
 
-LIBS		 	:= -L/usr/local/lib/ -lyajl -lm
+LIBS		 	:= -L/usr/local/lib/ -lyajl -lwebsockets -lm
 
 DEBUG_CXXFLAGS   := ${DEBUG_CFLAGS} 
 RELEASE_CXXFLAGS := ${RELEASE_CFLAGS}
@@ -79,7 +79,8 @@ SRCS := src/jsonrpc_server.c\
 		src/jsonrpc_mstream.c\
 		src/jsonrpc_memory.c\
 		plugins/jsonrpc_plugin_yajl.c\
-		example/test.c
+		example/test_websocket.c
+#		example/test.c
 
 
 # Add on the sources for libraries
