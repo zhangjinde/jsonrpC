@@ -64,6 +64,7 @@ jsonrpc_mstream_vprint (jsonrpc_mstream_t *mstream, const char *fmt, va_list ap)
 	char	*stream;
 	size_t	length;
 	int		written;
+	va_list	va;
 	int		retry = 10;
 
 	if (mstream->alloc - mstream->length <= 1)
@@ -73,14 +74,16 @@ jsonrpc_mstream_vprint (jsonrpc_mstream_t *mstream, const char *fmt, va_list ap)
 
 	while (retry--)
 	{
+		va_copy(va, ap);
 		stream  = mstream->stream + mstream->length;
 		length  = mstream->alloc - mstream->length - 1/*for NULL*/;
-		written = vsnprintf(stream, length, fmt, ap);
+		written = vsnprintf(stream, length, fmt, va);
 		if (0 <= written && written < (int)length)
 		{
 			mstream->length += (size_t)written;
 			return written;
 		}
+		printf("retry(%d)\n", mstream->alloc);
 		JSONRPC_THROW(mstream_grow(mstream) == 0, return -1);
 	}
 	return -1;
