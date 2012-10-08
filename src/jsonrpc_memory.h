@@ -12,6 +12,10 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+	
 /**
  * same as 'malloc'
  */
@@ -47,4 +51,8 @@ char *  jsonrpc_strdup (const char *str);
  */
 void    jsonrpc_vfree (void *mem, ...);
 
+#ifdef  __cplusplus
+}
+#endif
+		
 #endif

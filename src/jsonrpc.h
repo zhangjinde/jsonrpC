@@ -15,14 +15,11 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+#include "jsonrpc_config.h"
+
 #ifdef  __cplusplus
 extern "C" {
 #endif
-
-// <jsonrpc_config.h>
-#define	JSONRPC_VERSION				"2.0"
-
-// </jsonrpc_config.h>
 
 #define	JSONRPC_NAME_LEN		128
 
@@ -131,13 +128,6 @@ typedef jsonrpc_error_t (* jsonrpc_method_t) (
 							);
 
 
-void
-jsonrpc_set_alloc_funcs (
-				  void * (* _malloc) (size_t n, void *userdata)
-				, void * (* _realloc) (void *mem, size_t n, void *userdata)
-				, void (* _free)(void *mem, void *userdata)
-				, void *userdata
-			);
 
 
 /**
@@ -167,6 +157,13 @@ const char *
 jsonrpc_server_execute (jsonrpc_server_t *self, const char *request);
 
 
+void
+jsonrpc_set_alloc_funcs (
+				  void * (* _malloc) (size_t n, void *userdata)
+				, void * (* _realloc) (void *mem, size_t n, void *userdata)
+				, void (* _free)(void *mem, void *userdata)
+				, void *userdata
+			);
 #ifdef  __cplusplus
 }
 #endif

@@ -12,6 +12,10 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 typedef struct jsonrpc_mstream	jsonrpc_mstream_t;
 
 /**
@@ -77,5 +81,9 @@ jsonrpc_mstream_rewind (jsonrpc_mstream_t *mstream);
  */
 const char *
 jsonrpc_mstream_getbuf (jsonrpc_mstream_t *mstream);
+
+#ifdef  __cplusplus
+}
+#endif
 
 #endif
