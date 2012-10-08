@@ -11,6 +11,15 @@ jsonrpC
 
 jsonrpC is licensed under the [MIT License](http://www.opensource.org/licenses/mit-license.php)
 
+##Compilation
+```
+$mkdir build
+$cd build
+$cmake ..
+$make
+build output left in jsonrpc-x.y
+```
+
 ##Example
 ####Register Method
 ```C
@@ -40,15 +49,13 @@ void execute_jsonrpc(jsonrpc_server_t *server)
 ```
 ####Example code (screenshot)
 run server
-```shell
-$make
-$./jsonrpc
+```
+$example/jsonrpc_ws
 ```
 open test_websocket.html (with WebSocket supported browser)
 ![screenshot](http://farm9.staticflickr.com/8454/8062570242_1aea4d2602.jpg)
 
 ##ToDo
-* build with autotools or CMake
 * jsonrpC client library
 * jansson json plugin
 
