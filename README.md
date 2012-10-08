@@ -25,22 +25,22 @@ build output left in jsonrpc-x.y
 ```C
 jsonrpc_server_t * init_jsonrpc(void)
 {
-  jsonrpc_server_t *server;
+	jsonrpc_server_t *server;
 	jsonrpc_error_t   error;
 	
 	server = jsonrpc_server_open(jsonrpc_plugin_yajl());
 	
 	error  = jsonrpc_server_register_method(server, JSONRPC_TRUE, subtract, "subtract", "minuend:i, subtrahend:i");
 	error  = jsonrpc_server_register_method(server, JSONRPC_TRUE, sum, "sum", "iii");
-  // add more method here
-  return server;
+	// add more method here
+	return server;
 }
 ```
 ####Execute request
 ```C
 void execute_jsonrpc(jsonrpc_server_t *server)
 {
-  const char       *req, *res;
+	const char       *req, *res;
 	
 	req = "{\"jsonrpc\": \"2.0\", \"method\": \"subtract\", \"params\": {\"subtrahend\": 23, \"minuend\": 42}, \"id\": 3}";
 	res = jsonrpc_server_execute(server, req);
