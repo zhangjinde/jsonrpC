@@ -83,7 +83,6 @@ jsonrpc_mstream_vprint (jsonrpc_mstream_t *mstream, const char *fmt, va_list ap)
 			mstream->length += (size_t)written;
 			return written;
 		}
-		printf("retry(%d)\n", mstream->alloc);
 		JSONRPC_THROW(mstream_grow(mstream) == 0, return -1);
 	}
 	return -1;
