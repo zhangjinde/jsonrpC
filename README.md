@@ -4,9 +4,9 @@ jsonrpC
 [jsonrpC](http://jhlee4bb.github.com/jsonrpC) is an implementation of [JSON RPC 2.0](http://www.jsonrpc.org/specification) protocol in C.
 * Simple API
 * Portable
- * The implementation is ANSI C.
+ * ANSI C.
  * JSON library can be easily ported. (e.g. [yajl](http://lloyd.github.com/yajl), [jansson](http://www.digip.org/jansson/))
- * Transport independent. You can use this library with UDS, WebSocket, ...
+ * Transport independent. Use this library with UDS, WebSocket, ...
 * Tiny
 
 jsonrpC is licensed under the [MIT License](http://www.opensource.org/licenses/mit-license.php)
