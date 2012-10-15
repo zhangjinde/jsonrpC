@@ -38,6 +38,7 @@ typedef enum
 	, JSONRPC_ERROR_RESERVED_FOR_SERVER_END		= -32099
 		, JSONRPC_ERROR_SERVER_OUT_OF_MEMORY
 		, JSONRPC_ERROR_SERVER_INTERNAL
+		, JSONRPC_ERROR_SERVER_TIMEOUT
 	, JSONRPC_ERROR_RESERVED_FOR_SERVER_BEGIN	= -32000
 } jsonrpc_error_t;
 
@@ -113,6 +114,19 @@ typedef struct
 } jsonrpc_json_plugin_t;
 
 /**
+ * JSON-RPC json api plug-in
+ * -
+ */
+typedef struct
+{
+	jsonrpc_handle_t	(* open ) (va_list ap);
+	void				(* close) (jsonrpc_handle_t net);
+	const char *		(* recv ) (jsonrpc_handle_t net, unsigned int timeout, void **desc);
+	jsonrpc_error_t		(* send ) (jsonrpc_handle_t net, const char *data, void *desc);
+	jsonrpc_error_t		(* error) (jsonrpc_handle_t net);
+} jsonrpc_net_plugin_t;
+
+/**
  * JSON-RPC method
  * -
  * @param	argc	argument count
@@ -139,6 +153,8 @@ typedef struct jsonrpc_server	jsonrpc_server_t;
 jsonrpc_server_t *
 jsonrpc_server_open (
 				const jsonrpc_json_plugin_t *ijson
+				, const jsonrpc_net_plugin_t *inet
+				, ...
 			);
 
 void
@@ -155,6 +171,9 @@ jsonrpc_server_register_method (
 
 const char *
 jsonrpc_server_execute (jsonrpc_server_t *self, const char *request);
+
+jsonrpc_error_t
+jsonrpc_server_run (jsonrpc_server_t *self, unsigned int timeout);
 
 
 void

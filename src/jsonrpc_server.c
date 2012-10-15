@@ -30,8 +30,9 @@ typedef struct
 struct jsonrpc_server
 {
 	jsonrpc_json_plugin_t	json;
+	jsonrpc_net_plugin_t	net;
 
-	jsonrpc_handle_t		tp_handle;
+	jsonrpc_handle_t		net_handle;
 
 	struct {
 		jsonrpc_mstream_t	*mstream[JSONRPC_MEMSTREAM_NUM];
@@ -719,26 +720,36 @@ RESPONSE:
 
 
 jsonrpc_server_t *
-jsonrpc_server_open (const jsonrpc_json_plugin_t *ijson)
+jsonrpc_server_open (const jsonrpc_json_plugin_t *ijson, const jsonrpc_net_plugin_t *inet, ...)
 {
 	jsonrpc_server_t	*self;
 
 	JSONRPC_THROW(
 		check_null_func((void *)ijson, sizeof(jsonrpc_json_plugin_t)) != 0
+		&& (inet == NULL || (inet && check_null_func((void *)inet, sizeof(jsonrpc_net_plugin_t)) != 0))
 		, return NULL
 	);
 
 	self = (jsonrpc_server_t *)jsonrpc_calloc(1, sizeof(jsonrpc_server_t));
 	JSONRPC_THROW(self == NULL, return NULL);
-
-	JSONRPC_THROW(get_temp_param(self, 16/* default argc */) == NULL, {
-        jsonrpc_free(self);
-        return NULL;
-    });
+	JSONRPC_THROW(get_temp_param(self, 16/* default argc */) == NULL, goto ERROR);
 
 	memcpy(&self->json, ijson, sizeof(jsonrpc_json_plugin_t));
-
+	if (inet)
+	{
+		va_list	ap;
+		
+		memcpy(&self->net, inet, sizeof(jsonrpc_net_plugin_t));
+		
+		va_start(ap, inet);
+		self->net_handle = self->inet.open(ap);
+		va_end(ap);
+		JSONRPC_THROW(!self->net_handle, goto ERROR);
+	}
 	return self;
+ERROR:
+	jsonrpc_server_close(self);
+	return NULL;
 }
 
 void
@@ -746,6 +757,9 @@ jsonrpc_server_close (jsonrpc_server_t *self)
 {
 	size_t	i;
 
+	if (self->net_handle)
+		self->net.close(self->net_handle);
+	
 	for (i = 0 ; i < JSONRPC_MEMSTREAM_NUM ; i++)
 	{
 		if (self->stream.mstream[i])
@@ -830,4 +844,28 @@ jsonrpc_server_execute (jsonrpc_server_t *self, const char *request)
 	}
 	return execute(self, request);
 }
+
+jsonrpc_error_t
+jsonrpc_server_run (jsonrpc_server_t *self, unsigned int timeout)
+{
+	jsonrpc_error_t	error;
+	const char *req;
+	const char *res;
+	void *desc;
+
+	JSONRPC_THROW(self->net.open == NULL, return JSONRPC_ERROR_INVALID_REQUEST);
+
+	error = self->net.error(self->net_handle);
+	if (error != JSONRPC_ERROR_OK)
+		return error;
+
+	req = self->net.recv(self->net_handle, timeout, &desc);
+	JSONRPC_THROW(req == NULL, return JSONRPC_ERROR_SERVER_TIMEOUT);
+
+	res = jsonrpc_server_execute(self, req);
+	JSONRPC_THROW(res == NULL, return JSONRPC_ERROR_SERVER_INTERNAL);
+
+	return self->net.send(self->net_handle, res, desc);
+}
+
 
