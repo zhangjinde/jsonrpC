@@ -30,7 +30,7 @@ typedef struct
 
 	jsonrpc_queue_t			rx;
 	jsonrpc_queue_t 		tx;
-	jsonrpc_ws_data_t	*garbage;	// when?
+	jsonrpc_ws_data_t	*garbage;
 } jsonrpc_websocket_t;
 
 #define	MAX_WEBSOCKET_TEMP	64
@@ -195,13 +195,13 @@ static int websocket_listener (struct libwebsocket_context *context,
 	switch (reason)
 	{
 		case LWS_CALLBACK_ESTABLISHED:
-			fprintf(stderr, "%s(LWS_CALLBACK_ESTABLISHED)\n", __FUNCTION__);
+			//fprintf(stderr, "%s(LWS_CALLBACK_ESTABLISHED)\n", __FUNCTION__);
 			session = pop_websocket_from_temp(context);
 			*(jsonrpc_websocket_t **)user = session;			
 			break;
 			
 		case LWS_CALLBACK_SERVER_WRITEABLE:
-			fprintf(stderr, "%s(LWS_CALLBACK_SERVER_WRITEABLE)\n", __FUNCTION__);
+			//fprintf(stderr, "%s(LWS_CALLBACK_SERVER_WRITEABLE)\n", __FUNCTION__);
 			session = *(jsonrpc_websocket_t **)user;
 			data = queue_pop(&session->tx);
 			if (data)
@@ -211,7 +211,7 @@ static int websocket_listener (struct libwebsocket_context *context,
 				
 				if (n < 0)
 				{
-					fprintf(stderr, "ERROR writing to socket\n");
+					//fprintf(stderr, "ERROR writing to socket\n");
 					break;
 				}
 				libwebsocket_callback_on_writable(context, wsi);
@@ -219,16 +219,16 @@ static int websocket_listener (struct libwebsocket_context *context,
 			break;
 			
 		case LWS_CALLBACK_BROADCAST:
-			fprintf(stderr, "%s(LWS_CALLBACK_BROADCAST)\n", __FUNCTION__);
+			//fprintf(stderr, "%s(LWS_CALLBACK_BROADCAST)\n", __FUNCTION__);
 			session = *(jsonrpc_websocket_t **)user;
 			
 			n = libwebsocket_write(wsi, in, len, LWS_WRITE_TEXT);
 			if (n < 0)
-				fprintf(stderr, "mirror write failed\n");
+				//fprintf(stderr, "mirror write failed\n");
 			break;
 			
 		case LWS_CALLBACK_RECEIVE:
-			fprintf(stderr, "%s(LWS_CALLBACK_RECEIVE)\n", __FUNCTION__);
+			//fprintf(stderr, "%s(LWS_CALLBACK_RECEIVE)\n", __FUNCTION__);
 			session = *(jsonrpc_websocket_t **)user;
 			data    = queue_push(&session->rx, in);
 			if (data)
