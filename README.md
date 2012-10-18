@@ -21,37 +21,75 @@ build output left in jsonrpc-x.y
 ```
 
 ##Example
-####Register Method
+####Server
+test_websocket.c
 ```C
-jsonrpc_server_t * init_jsonrpc(void)
+jsonrpc_error_t subtract (int argc, const jsonrpc_param_t *argv, void (* print_result)(void *ctx, const char *fmt, ...), void *ctx)
+{
+	print_result(ctx, "%lf", 
+		argv[0].json.u.number - argv[1].json.u.number
+	);
+	return JSONRPC_ERROR_OK;
+}
+
+int main (int argc, const char * argv[])
 {
 	jsonrpc_server_t *server;
 	jsonrpc_error_t   error;
 	
-	server = jsonrpc_server_open(jsonrpc_plugin_yajl());
-	
+	server = jsonrpc_server_open(
+				/* json_plugin: yajl       */jsonrpc_plugin_yajl(), 
+				/*  net_plugin: websockets */jsonrpc_plugin_websockets_server(), 
+				/* port */8212
+			);
 	error  = jsonrpc_server_register_method(server, JSONRPC_TRUE, subtract, "subtract", "minuend:i, subtrahend:i");
-	error  = jsonrpc_server_register_method(server, JSONRPC_TRUE, sum, "sum", "iii");
-	// add more method here
-	return server;
+	// add more method here..
+
+	for (;;)
+	{
+		error = jsonrpc_server_run(server, 50);
+		if (error != JSONRPC_ERROR_OK && error != JSONRPC_ERROR_SERVER_TIMEOUT)
+			break;
+	}
+	jsonrpc_server_close(server);
+	return 0;
 }
 ```
-####Execute request
-```C
-void execute_jsonrpc(jsonrpc_server_t *server)
+
+####Client
+test_websocket.html
+```javascript
+var ws;
+
+function init()
 {
-	const char       *req, *res;
+	ws = new WebSocket("ws://localhost:8212", "jsonrpc-server-websocket");
+	ws.onopen = function(e) {
+		writeLog('WebSocket: CONNECTED');
+	};
+	ws.onclose = function(e) {
+		writeLog('WebSocket: DISCONNECTED');
+	};
+	ws.onmessage = function(e) {
+		writeLog('<-- ' + e.data);
+	};
+	ws.onerror = function(e) {
+		writeLog('WebSocket: ERROR(' + e.data + ')');
+	};
+}
+function request()
+{
+	var json=document.getElementById("pre_code").value;
 	
-	req = "{\"jsonrpc\": \"2.0\", \"method\": \"subtract\", \"params\": {\"subtrahend\": 23, \"minuend\": 42}, \"id\": 3}";
-	res = jsonrpc_server_execute(server, req);
-	// use 'res'
+	writeLog('--> ' + json)
+	ws.send(json);
+}
+function writeLog(text)
+{
+	document.getElementById("pre_output").value += text + '\n';
 }
 ```
-####Example code (screenshot)
-run server
-```
-$example/jsonrpc_ws
-```
+####Screenshot
 open test_websocket.html (with WebSocket supported browser)
 ![screenshot](http://farm9.staticflickr.com/8454/8062570242_1aea4d2602.jpg)
 
