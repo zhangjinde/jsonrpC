@@ -59,40 +59,78 @@ build output left in jsonrpc-x.y
 
 <h2>Example</h2>
 
-<h4>Register Method</h4>
+<h4>Server</h4>
 
-<div class="highlight"><pre><span class="n">jsonrpc_server_t</span> <span class="o">*</span> <span class="nf">init_jsonrpc</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<p>test_websocket.c</p>
+
+<div class="highlight"><pre><span class="n">jsonrpc_error_t</span> <span class="nf">subtract</span> <span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="k">const</span> <span class="n">jsonrpc_param_t</span> <span class="o">*</span><span class="n">argv</span><span class="p">,</span> <span class="kt">void</span> <span class="p">(</span><span class="o">*</span> <span class="n">print_result</span><span class="p">)(</span><span class="kt">void</span> <span class="o">*</span><span class="n">ctx</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">fmt</span><span class="p">,</span> <span class="p">...),</span> <span class="kt">void</span> <span class="o">*</span><span class="n">ctx</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">print_result</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="s">"%lf"</span><span class="p">,</span> 
+        <span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">json</span><span class="p">.</span><span class="n">u</span><span class="p">.</span><span class="n">number</span> <span class="o">-</span> <span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">json</span><span class="p">.</span><span class="n">u</span><span class="p">.</span><span class="n">number</span>
+    <span class="p">);</span>
+    <span class="k">return</span> <span class="n">JSONRPC_ERROR_OK</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">int</span> <span class="nf">main</span> <span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span> <span class="n">argv</span><span class="p">[])</span>
 <span class="p">{</span>
     <span class="n">jsonrpc_server_t</span> <span class="o">*</span><span class="n">server</span><span class="p">;</span>
     <span class="n">jsonrpc_error_t</span>   <span class="n">error</span><span class="p">;</span>
 
-    <span class="n">server</span> <span class="o">=</span> <span class="n">jsonrpc_server_open</span><span class="p">(</span><span class="n">jsonrpc_plugin_yajl</span><span class="p">());</span>
-
+    <span class="n">server</span> <span class="o">=</span> <span class="n">jsonrpc_server_open</span><span class="p">(</span>
+                <span class="cm">/* json_plugin: yajl       */</span><span class="n">jsonrpc_plugin_yajl</span><span class="p">(),</span> 
+                <span class="cm">/*  net_plugin: websockets */</span><span class="n">jsonrpc_plugin_websockets_server</span><span class="p">(),</span> 
+                <span class="cm">/* port */</span><span class="mi">8212</span>
+            <span class="p">);</span>
     <span class="n">error</span>  <span class="o">=</span> <span class="n">jsonrpc_server_register_method</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">JSONRPC_TRUE</span><span class="p">,</span> <span class="n">subtract</span><span class="p">,</span> <span class="s">"subtract"</span><span class="p">,</span> <span class="s">"minuend:i, subtrahend:i"</span><span class="p">);</span>
-    <span class="n">error</span>  <span class="o">=</span> <span class="n">jsonrpc_server_register_method</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">JSONRPC_TRUE</span><span class="p">,</span> <span class="n">sum</span><span class="p">,</span> <span class="s">"sum"</span><span class="p">,</span> <span class="s">"iii"</span><span class="p">);</span>
-    <span class="c1">// add more method here</span>
-    <span class="k">return</span> <span class="n">server</span><span class="p">;</span>
+    <span class="c1">// add more method here..</span>
+
+    <span class="k">for</span> <span class="p">(;;)</span>
+    <span class="p">{</span>
+        <span class="n">error</span> <span class="o">=</span> <span class="n">jsonrpc_server_run</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="mi">50</span><span class="p">);</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">error</span> <span class="o">!=</span> <span class="n">JSONRPC_ERROR_OK</span> <span class="o">&amp;&amp;</span> <span class="n">error</span> <span class="o">!=</span> <span class="n">JSONRPC_ERROR_SERVER_TIMEOUT</span><span class="p">)</span>
+            <span class="k">break</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">jsonrpc_server_close</span><span class="p">(</span><span class="n">server</span><span class="p">);</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
 <span class="p">}</span>
 </pre></div>
 
-<h4>Execute request</h4>
+<h4>Client</h4>
 
-<div class="highlight"><pre><span class="kt">void</span> <span class="nf">execute_jsonrpc</span><span class="p">(</span><span class="n">jsonrpc_server_t</span> <span class="o">*</span><span class="n">server</span><span class="p">)</span>
+<p>test_websocket.html</p>
+
+<div class="highlight"><pre><span class="kd">var</span> <span class="nx">ws</span><span class="p">;</span>
+
+<span class="kd">function</span> <span class="nx">init</span><span class="p">()</span>
 <span class="p">{</span>
-    <span class="k">const</span> <span class="kt">char</span>       <span class="o">*</span><span class="n">req</span><span class="p">,</span> <span class="o">*</span><span class="n">res</span><span class="p">;</span>
+    <span class="nx">ws</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">WebSocket</span><span class="p">(</span><span class="s2">"ws://localhost:8212"</span><span class="p">,</span> <span class="s2">"jsonrpc-server-websocket"</span><span class="p">);</span>
+    <span class="nx">ws</span><span class="p">.</span><span class="nx">onopen</span> <span class="o">=</span> <span class="kd">function</span><span class="p">(</span><span class="nx">e</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nx">writeLog</span><span class="p">(</span><span class="s1">'WebSocket: CONNECTED'</span><span class="p">);</span>
+    <span class="p">};</span>
+    <span class="nx">ws</span><span class="p">.</span><span class="nx">onclose</span> <span class="o">=</span> <span class="kd">function</span><span class="p">(</span><span class="nx">e</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nx">writeLog</span><span class="p">(</span><span class="s1">'WebSocket: DISCONNECTED'</span><span class="p">);</span>
+    <span class="p">};</span>
+    <span class="nx">ws</span><span class="p">.</span><span class="nx">onmessage</span> <span class="o">=</span> <span class="kd">function</span><span class="p">(</span><span class="nx">e</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nx">writeLog</span><span class="p">(</span><span class="s1">'&lt;-- '</span> <span class="o">+</span> <span class="nx">e</span><span class="p">.</span><span class="nx">data</span><span class="p">);</span>
+    <span class="p">};</span>
+    <span class="nx">ws</span><span class="p">.</span><span class="nx">onerror</span> <span class="o">=</span> <span class="kd">function</span><span class="p">(</span><span class="nx">e</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nx">writeLog</span><span class="p">(</span><span class="s1">'WebSocket: ERROR('</span> <span class="o">+</span> <span class="nx">e</span><span class="p">.</span><span class="nx">data</span> <span class="o">+</span> <span class="s1">')'</span><span class="p">);</span>
+    <span class="p">};</span>
+<span class="p">}</span>
+<span class="kd">function</span> <span class="nx">request</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">json</span><span class="o">=</span><span class="nb">document</span><span class="p">.</span><span class="nx">getElementById</span><span class="p">(</span><span class="s2">"pre_code"</span><span class="p">).</span><span class="nx">value</span><span class="p">;</span>
 
-    <span class="n">req</span> <span class="o">=</span> <span class="s">"{</span><span class="se">\"</span><span class="s">jsonrpc</span><span class="se">\"</span><span class="s">: </span><span class="se">\"</span><span class="s">2.0</span><span class="se">\"</span><span class="s">, </span><span class="se">\"</span><span class="s">method</span><span class="se">\"</span><span class="s">: </span><span class="se">\"</span><span class="s">subtract</span><span class="se">\"</span><span class="s">, </span><span class="se">\"</span><span class="s">params</span><span class="se">\"</span><span class="s">: {</span><span class="se">\"</span><span class="s">subtrahend</span><span class="se">\"</span><span class="s">: 23, </span><span class="se">\"</span><span class="s">minuend</span><span class="se">\"</span><span class="s">: 42}, </span><span class="se">\"</span><span class="s">id</span><span class="se">\"</span><span class="s">: 3}"</span><span class="p">;</span>
-    <span class="n">res</span> <span class="o">=</span> <span class="n">jsonrpc_server_execute</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">req</span><span class="p">);</span>
-    <span class="c1">// use 'res'</span>
+    <span class="nx">writeLog</span><span class="p">(</span><span class="s1">'--&gt; '</span> <span class="o">+</span> <span class="nx">json</span><span class="p">)</span>
+    <span class="nx">ws</span><span class="p">.</span><span class="nx">send</span><span class="p">(</span><span class="nx">json</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="kd">function</span> <span class="nx">writeLog</span><span class="p">(</span><span class="nx">text</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="nb">document</span><span class="p">.</span><span class="nx">getElementById</span><span class="p">(</span><span class="s2">"pre_output"</span><span class="p">).</span><span class="nx">value</span> <span class="o">+=</span> <span class="nx">text</span> <span class="o">+</span> <span class="s1">'\n'</span><span class="p">;</span>
 <span class="p">}</span>
 </pre></div>
 
-<h4>Example code (screenshot)</h4>
-
-<p>run server</p>
-
-<pre><code>$example/jsonrpc_ws
-</code></pre>
+<h4>Screenshot</h4>
 
 <p>open test_websocket.html (with WebSocket supported browser)
 <img src="http://farm9.staticflickr.com/8454/8062570242_1aea4d2602.jpg" alt="screenshot"></p>
