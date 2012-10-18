@@ -114,7 +114,8 @@ int main (int argc, const char * argv[])
 	server = jsonrpc_server_open(
 				jsonrpc_plugin_yajl(), 
 				jsonrpc_plugin_websockets_server(), 
-				8212
+				8212,
+				"jsonrpc-server-websocket"
 			);
 	error  = jsonrpc_server_register_method(server, JSONRPC_TRUE, subtract, "subtract", "minuend:i, subtrahend:i");
 	error  = jsonrpc_server_register_method(server, JSONRPC_TRUE, sum, "sum", "iii");

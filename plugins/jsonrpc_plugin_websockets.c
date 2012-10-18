@@ -265,6 +265,7 @@ static jsonrpc_handle_t	jsonrpc_websockets_server_open (va_list ap)
 	};
 
 	port   = va_arg(ap, int);
+	protocols[0].name = va_arg(ap, const char *);
 	ws_server = (jsonrpc_websocket_t *)calloc(1, sizeof(jsonrpc_websocket_t));
 	if (!ws_server)
 		return (jsonrpc_handle_t)NULL;
