@@ -10,78 +10,138 @@
 
 #include <libwebsockets.h>
 
-typedef struct jsonrpc_q
+typedef struct jsonrpc_ws_data
 {
-	struct jsonrpc_q	*next;
+	struct jsonrpc_ws_data	*next;
+	struct libwebsocket 	*wsi;
 	size_t		size;
 	char		data[4];
+} jsonrpc_ws_data_t;
+
+typedef struct
+{
+	jsonrpc_ws_data_t	*head;
+	jsonrpc_ws_data_t	*tail;
 } jsonrpc_queue_t;
 
 typedef struct
 {
-	struct libwebsocket_context	*ws_ctx;
-	
-	jsonrpc_queue_t	*head;
-	jsonrpc_queue_t	*tail;
-	jsonrpc_queue_t	*garbage;	// when?
+	struct libwebsocket_context *ws_ctx;
+
+	jsonrpc_queue_t			rx;
+	jsonrpc_queue_t 		tx;
+	jsonrpc_ws_data_t	*garbage;	// when?
 } jsonrpc_websocket_t;
 
-#define	MAX_WEBSOCKET_CLIENT	32
-// TODO: semaphore
-static jsonrpc_websocket_t	ws_list[MAX_WEBSOCKET_CLIENT];
+#define	MAX_WEBSOCKET_TEMP	64
+// TODO: semaphore.. ??
+static jsonrpc_websocket_t *ws_temp[MAX_WEBSOCKET_TEMP];
 
-static jsonrpc_websocket_t *find_websocket (struct libwebsocket_context *ctx)
+static void	push_websocket_to_temp (jsonrpc_websocket_t *ws)
 {
-	int	i;
-	for (i = 0 ; i < MAX_WEBSOCKET_CLIENT ; i++)
+	int n = MAX_WEBSOCKET_TEMP;
+	while (n--)
 	{
-		if (ws_list[i].ws_ctx == ctx)
-			return ws_list + i;
+		if (ws_temp[n] == NULL)
+		{
+			ws_temp[n] = ws;
+			break;
+		}
+	}
+}
+
+static jsonrpc_websocket_t *	pop_websocket_from_temp (struct libwebsocket_context *ctx)
+{
+	int n = MAX_WEBSOCKET_TEMP;
+	while (n--)
+	{
+		if (ws_temp[n] && ws_temp[n]->ws_ctx == ctx)
+		{
+			jsonrpc_websocket_t *ws = ws_temp[n];
+			ws_temp[n] = NULL;
+			return ws;
+		}
 	}
 	return NULL;
 }
 
 
-static void	queue_push (jsonrpc_websocket_t *ws, const char *text)
+static jsonrpc_ws_data_t *	queue_push (jsonrpc_queue_t *queue, const char *text)
 {
-	jsonrpc_queue_t	*q;
+	jsonrpc_ws_data_t	*q;
 	size_t	len;
 	
-	if (response == NULL)
-		return;
+	if (text == NULL)
+		return NULL;
 	len = strlen(text);
 	if (len == 0)
-		return;
+		return NULL;
 	
-	q = (jsonrpc_queue_t *)calloc(1, sizeof(jsonrpc_queue_t) + len);
+	q = (jsonrpc_ws_data_t *)calloc(1, sizeof(jsonrpc_ws_data_t) + len);
 	if (q == NULL)
-		return;
+		return NULL;
 	
 	q->size = len;
 	memcpy(q->data, text, len);
 	
-	if (ws->tail == NULL)
-		ws->head = ws->tail = q;
+	if (queue->tail == NULL)
+		queue->head = queue->tail = q;
 	else
 	{
-		ws->tail->next = q;
-		ws->tail = q;
+		queue->tail->next = q;
+		queue->tail = q;
 	}
+	return q;
 }
 
-static jsonrpc_queue_t *	queue_pop (jsonrpc_websocket_t *ws)
+static jsonrpc_ws_data_t *	queue_pop (jsonrpc_queue_t *queue)
 {
-	jsonrpc_queue_t *q;
+	jsonrpc_ws_data_t *q;
 	
-	q = session->head;
+	q = queue->head;
 	if (q == NULL)
 		return NULL;
 	
-	ws->head = q->next;
-	if (ws->head == NULL)
-		ws->tail = NULL;
+	queue->head = q->next;
+	if (queue->head == NULL)
+		queue->tail = NULL;
+	q->next = NULL;
 	return q;
 }
+
+static void	queue_remove_all (jsonrpc_queue_t *queue)
+{
+	jsonrpc_ws_data_t *freed, *item;
+
+	item = queue->head;
+	while (item)
+	{
+		freed = item;
+		item = item->next;
+		free(freed);
+	}
+}
+
+static void	queue_put_into_trash (jsonrpc_websocket_t *ws, jsonrpc_ws_data_t *item)
+{
+	item->next = ws->garbage;
+	ws->garbage = item;
+}
+
+static void	queue_gc (jsonrpc_websocket_t *ws)
+{
+	jsonrpc_ws_data_t *freed, *garbage;
+
+	garbage = ws->garbage;
+	while (garbage)
+	{
+		freed = garbage;
+		garbage = garbage->next;
+		free(freed);
+	}
+	ws->garbage = NULL;
+}
+
 
 static void
 dump_handshake_info(struct lws_tokens *lwst)
@@ -122,88 +182,32 @@ dump_handshake_info(struct lws_tokens *lwst)
 	}
 }
 
-#define	MAX_RESPONSE_Q	32
-typedef struct jsonrpc_response
-{
-	struct jsonrpc_response *next;
-	size_t		size;
-	char		data[4];
-} jsonrpc_response_t;
-
-typedef struct jsonrpc_session {
-	struct libwebsocket *wsi;
-	jsonrpc_server_t	*jsonrpc_server;
-	
-	jsonrpc_response_t	*head;
-	jsonrpc_response_t	*tail;
-} jsonrpc_session_t;
-
-static void	push_response (jsonrpc_session_t *session, const char *response)
-{
-	jsonrpc_response_t	*r;
-	size_t	len;
-	
-	if (response == NULL)
-		return;
-	len = strlen(response);
-	if (len == 0)
-		return;
-	
-	r = (jsonrpc_response_t *)calloc(1, sizeof(jsonrpc_response_t) + len);
-	if (r == NULL)
-		return;
-	
-	r->size = len;
-	memcpy(r->data, response, len);
-	
-	if (session->tail == NULL)
-		session->head = session->tail = r;
-	else
-	{
-		session->tail->next = r;
-		session->tail = r;
-	}
-}
-
-static jsonrpc_response_t *	pop_response (jsonrpc_session_t *session)
-{
-	jsonrpc_response_t *response;
-	
-	response = session->head;
-	if (response == NULL)
-		return NULL;
-	
-	session->head = response->next;
-	if (session->head == NULL)
-		session->tail = NULL;
-	return response;
-}
 
 static int websocket_listener (struct libwebsocket_context *context,
 							   struct libwebsocket *wsi,
 							   enum libwebsocket_callback_reasons reason, void *user,
 							   void *in, size_t len)
 {
-	jsonrpc_session_t  *session = (jsonrpc_session_t *)user;
-	jsonrpc_response_t *response;
+	jsonrpc_websocket_t *session;
+	jsonrpc_ws_data_t   *data;
 	int	n;
-	const char *result;
 	
 	switch (reason)
 	{
 		case LWS_CALLBACK_ESTABLISHED:
-			//fprintf(stderr, "%s(LWS_CALLBACK_ESTABLISHED)\n", __FUNCTION__);
-			session->jsonrpc_server = get_jsonrpc_server();
-			session->wsi = wsi;
+			fprintf(stderr, "%s(LWS_CALLBACK_ESTABLISHED)\n", __FUNCTION__);
+			session = pop_websocket_from_temp(context);
+			*(jsonrpc_websocket_t **)user = session;			
 			break;
 			
 		case LWS_CALLBACK_SERVER_WRITEABLE:
-			//fprintf(stderr, "%s(LWS_CALLBACK_SERVER_WRITEABLE)\n", __FUNCTION__);
-			response = pop_response(session);
-			if (response)
+			fprintf(stderr, "%s(LWS_CALLBACK_SERVER_WRITEABLE)\n", __FUNCTION__);
+			session = *(jsonrpc_websocket_t **)user;
+			data = queue_pop(&session->tx);
+			if (data)
 			{
-				n = libwebsocket_write(wsi, (unsigned char *)response->data, response->size, LWS_WRITE_TEXT);
-				free(response);
+				n = libwebsocket_write(wsi, (unsigned char *)data->data, data->size, LWS_WRITE_TEXT);
+				free(data);
 				
 				if (n < 0)
 				{
@@ -215,7 +219,8 @@ static int websocket_listener (struct libwebsocket_context *context,
 			break;
 			
 		case LWS_CALLBACK_BROADCAST:
-			//fprintf(stderr, "%s(LWS_CALLBACK_BROADCAST)\n", __FUNCTION__);
+			fprintf(stderr, "%s(LWS_CALLBACK_BROADCAST)\n", __FUNCTION__);
+			session = *(jsonrpc_websocket_t **)user;
 			
 			n = libwebsocket_write(wsi, in, len, LWS_WRITE_TEXT);
 			if (n < 0)
@@ -223,14 +228,11 @@ static int websocket_listener (struct libwebsocket_context *context,
 			break;
 			
 		case LWS_CALLBACK_RECEIVE:
-			//fprintf(stderr, "%s(LWS_CALLBACK_RECEIVE)\n", __FUNCTION__);
-			
-			result = jsonrpc_server_execute(session->jsonrpc_server, in);
-			if (result)
-			{
-				push_response(session, result);
-				libwebsocket_callback_on_writable_all_protocol(libwebsockets_get_protocol(wsi));
-			}
+			fprintf(stderr, "%s(LWS_CALLBACK_RECEIVE)\n", __FUNCTION__);
+			session = *(jsonrpc_websocket_t **)user;
+			data    = queue_push(&session->rx, in);
+			if (data)
+				data->wsi = wsi;
 			break;
 			
 			/*
@@ -252,27 +254,96 @@ static int websocket_listener (struct libwebsocket_context *context,
 
 static jsonrpc_handle_t	jsonrpc_websockets_server_open (va_list ap)
 {
-	
+	struct libwebsocket_context *ws_ctx;
+	jsonrpc_websocket_t	*ws_server;
+	int port;
+
+	static struct libwebsocket_protocols protocols[] =
+	{
+		{"jsonrpc-server-websocket", websocket_listener, sizeof(jsonrpc_websocket_t **), },
+		{NULL, NULL, 0		/* End of list */}
+	};
+
+	port   = va_arg(ap, int);
+	ws_server = (jsonrpc_websocket_t *)calloc(1, sizeof(jsonrpc_websocket_t));
+	if (!ws_server)
+		return (jsonrpc_handle_t)NULL;
+
+	ws_ctx = libwebsocket_create_context(port, NULL, protocols, libwebsocket_internal_extensions, NULL, NULL, -1, -1, 0);
+	if (!ws_ctx)
+	{
+		free(ws_server);
+		return (jsonrpc_handle_t)NULL;
+	}
+	ws_server->ws_ctx = ws_ctx;
+	push_websocket_to_temp(ws_server);
+
+	return ws_server;
 }
 
 static void				jsonrpc_websockets_server_close (jsonrpc_handle_t net)
 {
-	
+	jsonrpc_websocket_t *ws;
+
+	ws = (jsonrpc_websocket_t *)net;
+	if (ws)
+	{
+		libwebsocket_context_destroy(ws->ws_ctx);
+		queue_gc(ws);
+		queue_remove_all(&ws->rx);
+		queue_remove_all(&ws->tx);
+		free(ws);
+	}
 }
 
 static const char *		jsonrpc_websockets_server_recv  (jsonrpc_handle_t net, unsigned int timeout, void **desc)
 {
-	
+	jsonrpc_websocket_t		*ws;
+	jsonrpc_ws_data_t		*recv;
+	int 					n = 2;
+
+	ws = (jsonrpc_websocket_t *)net;
+	queue_gc(ws);
+
+	while (n--)
+	{
+		recv = queue_pop(&ws->rx);
+		if (recv)
+		{
+			queue_put_into_trash(ws, recv);
+			if (desc)
+				*desc = recv->wsi;
+			return recv->data;
+		}
+		if (n == 1)
+			libwebsocket_service(ws->ws_ctx, timeout);
+	}
+	return NULL;
 }
 
 static jsonrpc_error_t	jsonrpc_websockets_server_send  (jsonrpc_handle_t net, const char *data, void *desc)
 {
-	
+	jsonrpc_websocket_t *ws;
+
+	ws = (jsonrpc_websocket_t *)net;
+
+	queue_push(&ws->tx, data);
+
+	libwebsocket_callback_on_writable_all_protocol(
+		libwebsockets_get_protocol(desc)
+	);
+	return JSONRPC_ERROR_OK;
 }
 
 static jsonrpc_error_t	jsonrpc_websockets_server_error (jsonrpc_handle_t net)
 {
-	
+	jsonrpc_websocket_t *ws;
+
+	ws = (jsonrpc_websocket_t *)net;
+
+	// TODO:
+
+	return JSONRPC_ERROR_OK;
 }
 
 const jsonrpc_net_plugin_t	* jsonrpc_plugin_websockets_server (void)

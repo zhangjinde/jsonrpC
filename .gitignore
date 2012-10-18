@@ -6,3 +6,8 @@
 jsonrpc
 
 jsonrpc_win32
+
+*.sublime-*
+.tags
+
+.tags_sorted_by_file

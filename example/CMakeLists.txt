@@ -3,6 +3,7 @@
 SET (SRCS 
 		test_websocket.c
 		../plugins/jsonrpc_plugin_yajl.c
+		../plugins/jsonrpc_plugin_websockets.c
 )
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR}/../${JSONRPC_DIST_NAME}/include)

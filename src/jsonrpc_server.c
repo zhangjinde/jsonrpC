@@ -742,7 +742,7 @@ jsonrpc_server_open (const jsonrpc_json_plugin_t *ijson, const jsonrpc_net_plugi
 		memcpy(&self->net, inet, sizeof(jsonrpc_net_plugin_t));
 		
 		va_start(ap, inet);
-		self->net_handle = self->inet.open(ap);
+		self->net_handle = self->net.open(ap);
 		va_end(ap);
 		JSONRPC_THROW(!self->net_handle, goto ERROR);
 	}
@@ -860,7 +860,8 @@ jsonrpc_server_run (jsonrpc_server_t *self, unsigned int timeout)
 		return error;
 
 	req = self->net.recv(self->net_handle, timeout, &desc);
-	JSONRPC_THROW(req == NULL, return JSONRPC_ERROR_SERVER_TIMEOUT);
+	if (req == NULL)
+		return JSONRPC_ERROR_SERVER_TIMEOUT;
 
 	res = jsonrpc_server_execute(self, req);
 	JSONRPC_THROW(res == NULL, return JSONRPC_ERROR_SERVER_INTERNAL);
